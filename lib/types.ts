@@ -79,6 +79,9 @@ export type Movement = {
   relatedRequestId?: string;
   date: string;
   note: string;
+  correctionReason?: string;
+  replacesMovementId?: string;
+  replacedByMovementId?: string;
 };
 
 export type ReportFilter = {
@@ -116,6 +119,15 @@ export type OutputDraft = {
   note: string;
 };
 
+export type MovementUpdateDraft = {
+  quantity: number;
+  actor: string;
+  source?: string;
+  condition?: StockCondition;
+  note: string;
+  correctionReason: string;
+};
+
 export type RequestDraft = {
   articleId: string;
   quantity: number;
@@ -144,6 +156,15 @@ export type ArticleDraft = {
   categoryId: string;
   reference: string;
   availableQty: number;
+  alertThreshold: number;
+  unit: string;
+};
+
+export type ArticleUpdateDraft = {
+  name: string;
+  brandId: string;
+  categoryId: string;
+  reference: string;
   alertThreshold: number;
   unit: string;
 };

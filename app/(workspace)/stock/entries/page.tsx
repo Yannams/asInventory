@@ -1,5 +1,5 @@
-import { EntriesScreen } from "@/components/entries-screen";
+import { redirect } from "next/navigation";
 
 export default function EntriesPage() {
-  return <EntriesScreen />;
+  redirect("/stock/movements?kind=entry");
 }

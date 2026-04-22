@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRightLeft, FolderTree, PencilLine, Plus, Trash2 } from "lucide-react";
 
+import { ActionMenu, ActionMenuItem } from "@/components/action-menu";
 import { FilterMenu } from "@/components/filter-menu";
 import { LabeledField } from "@/components/labeled-field";
 import {
-  ListFeedbackBanner,
   ListPageHeader,
   ListSearchBar,
   ListStatCard,
@@ -19,7 +18,7 @@ import {
   ListToolbarRow,
 } from "@/components/list-page";
 import { useInventory } from "@/components/inventory-provider";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogBody,
@@ -31,12 +30,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import { getBrandName } from "@/lib/catalog";
-
-type Feedback = {
-  kind: "success" | "error";
-  text: string;
-};
 
 export function CategoriesScreen() {
   const {
@@ -47,13 +42,13 @@ export function CategoriesScreen() {
     updateCategory,
     deleteCategory,
   } = useInventory();
+  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("all");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const deferredSearch = useDeferredValue(search);
   const activeFilterCount = brandFilter !== "all" ? 1 : 0;
 
@@ -90,7 +85,6 @@ export function CategoriesScreen() {
     setEditingCategoryId(null);
     setBrandId(brands[0]?.id ?? "");
     setName("");
-    setFeedback(null);
     setDialogOpen(true);
   }
 
@@ -98,7 +92,6 @@ export function CategoriesScreen() {
     setEditingCategoryId(categoryId);
     setBrandId(currentBrandId);
     setName(currentName);
-    setFeedback(null);
     setDialogOpen(true);
   }
 
@@ -116,9 +109,14 @@ export function CategoriesScreen() {
       ? updateCategory(editingCategoryId, { brandId, name })
       : createCategory({ brandId, name });
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok
+        ? editingCategoryId
+          ? "Catégorie mise à jour"
+          : "Catégorie ajoutée"
+        : "Action impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
 
     if (result.ok) {
@@ -129,52 +127,47 @@ export function CategoriesScreen() {
   function handleDelete(categoryId: string) {
     const result = deleteCategory(categoryId);
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok ? "Catégorie supprimée" : "Suppression impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
   }
 
   return (
     <div className="space-y-6">
       <ListPageHeader
-        title="Gestion des categories"
-        description="Organisez les familles d articles par marque dans une liste unique, claire et facile a administrer."
+        icon={FolderTree}
+        title="Gestion des catégories"
+        description="Organisez les familles d’articles par marque dans une liste unique, claire et facile à administrer."
         action={
-          <>
-            <Link href="/configuration/brands" className={buttonVariants({ variant: "outline" })}>
-              Voir les brands
-            </Link>
-            <Button className="gap-2" onClick={openCreateDialog}>
-              <Plus className="h-4 w-4" />
-              Ajouter une categorie
-            </Button>
-          </>
+          <Button className="gap-2" onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" />
+            Ajouter une catégorie
+          </Button>
         }
       />
 
       <ListStatsGrid>
-        <ListStatCard label="Categories" value={`${categories.length}`} detail="rubriques catalogue" />
-        <ListStatCard label="Brands" value={`${brands.length}`} detail="marques supportees" />
+        <ListStatCard label="Catégories" value={`${categories.length}`} detail="rubriques catalogue" />
+        <ListStatCard label="Marques" value={`${brands.length}`} detail="marques supportées" />
         <ListStatCard
-          label="Articles relies"
+          label="Articles liés"
           value={`${articles.length}`}
-          detail="references appuyees sur ces categories"
+          detail="références appuyées sur ces catégories"
         />
       </ListStatsGrid>
-      {feedback ? <ListFeedbackBanner kind={feedback.kind} text={feedback.text} /> : null}
-
       <ListToolbar>
         <ListToolbarRow>
           <ListSearchBar
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Rechercher une categorie"
+            placeholder="Rechercher une catégorie"
           />
           <FilterMenu activeCount={activeFilterCount} onClear={() => setBrandFilter("all")}>
-            <LabeledField label="Brand">
+            <LabeledField label="Marque">
               <Select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
-                <option value="all">Toutes les brands</option>
+                <option value="all">Toutes les marques</option>
                 {brands.map((brand) => (
                   <option key={brand.id} value={brand.id}>
                     {brand.name}
@@ -189,10 +182,10 @@ export function CategoriesScreen() {
       <ListTable>
         <thead>
           <tr className="bg-black/[0.03] text-left">
-            <ListTableHeadCell>Categorie</ListTableHeadCell>
-            <ListTableHeadCell>Brand</ListTableHeadCell>
+            <ListTableHeadCell>Catégorie</ListTableHeadCell>
+            <ListTableHeadCell>Marque</ListTableHeadCell>
             <ListTableHeadCell>Articles</ListTableHeadCell>
-            <ListTableHeadCell>Reaffectation</ListTableHeadCell>
+            <ListTableHeadCell>Réaffectation</ListTableHeadCell>
             <ListTableHeadCell>Actions</ListTableHeadCell>
           </tr>
         </thead>
@@ -227,31 +220,26 @@ export function CategoriesScreen() {
                 <ListTableCell>
                   <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
                     <ArrowRightLeft className="h-4 w-4" />
-                    {linkedArticles > 0 ? "Articles suivront la brand" : "Libre"}
+                    {linkedArticles > 0 ? "Les articles suivront la marque" : "Libre"}
                   </div>
                 </ListTableCell>
                 <ListTableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(category.id, category.brandId, category.name)}
+                  <ActionMenu label={`Ouvrir les actions de la catégorie ${category.name}`}>
+                    <ActionMenuItem
+                      icon={PencilLine}
+                      onSelect={() => openEditDialog(category.id, category.brandId, category.name)}
                     >
-                      <PencilLine className="h-4 w-4" />
                       Modifier
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      icon={Trash2}
+                      destructive
                       disabled={!canDelete}
-                      onClick={() => handleDelete(category.id)}
+                      onSelect={() => handleDelete(category.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
                       Supprimer
-                    </Button>
-                  </div>
+                    </ActionMenuItem>
+                  </ActionMenu>
                 </ListTableCell>
               </tr>
             );
@@ -264,24 +252,24 @@ export function CategoriesScreen() {
           <DialogHeader>
             <div>
               <DialogTitle>
-                {editingCategoryId ? "Modifier une categorie" : "Ajouter une categorie"}
+                {editingCategoryId ? "Modifier une catégorie" : "Ajouter une catégorie"}
               </DialogTitle>
               <DialogDescription>
-                Si la categorie change de brand, les articles relies sont realignes automatiquement.
+                Si la catégorie change de marque, les articles liés sont réalignés automatiquement.
               </DialogDescription>
             </div>
             <DialogCloseButton onClick={closeDialog} />
           </DialogHeader>
           <DialogBody>
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <LabeledField label="Brand">
+              <LabeledField label="Marque">
                 <Select
                   value={brandId}
                   onChange={(event) => setBrandId(event.target.value)}
                   disabled={brands.length === 0}
                 >
                   {brands.length === 0 ? (
-                    <option value="">Ajoutez d abord une brand</option>
+                    <option value="">Ajoutez d’abord une marque</option>
                   ) : (
                     brands.map((brand) => (
                       <option key={brand.id} value={brand.id}>
@@ -291,7 +279,7 @@ export function CategoriesScreen() {
                   )}
                 </Select>
               </LabeledField>
-              <LabeledField label="Nom de la categorie">
+              <LabeledField label="Nom de la catégorie">
                 <Input
                   value={name}
                   placeholder="Ex: Accessoires premium"
@@ -303,7 +291,7 @@ export function CategoriesScreen() {
                   Annuler
                 </Button>
                 <Button type="submit" disabled={brands.length === 0}>
-                  {editingCategoryId ? "Mettre a jour" : "Ajouter la categorie"}
+                  {editingCategoryId ? "Mettre à jour" : "Ajouter la catégorie"}
                 </Button>
               </div>
             </form>

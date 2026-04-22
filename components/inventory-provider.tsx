@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   createContext,
@@ -11,23 +11,29 @@ import {
 } from "react";
 
 import { inventorySeed } from "@/lib/mock-data";
-import { hydrateArticlesWithStock } from "@/lib/stock";
+import { getActiveMovements, hydrateArticlesWithStock } from "@/lib/stock";
 import {
+  clearMovementReplacementInSupabase,
+  deleteArticleInSupabase,
   deleteBrandInSupabase,
   deleteCategoryInSupabase,
+  deleteMovementInSupabase,
   fetchInventoryFromSupabase,
   insertArticleInSupabase,
   insertBrandInSupabase,
   insertCategoryInSupabase,
   insertMovementInSupabase,
   isSupabaseInventoryEnabled,
+  markMovementAsReplacedInSupabase,
   syncArticlesBrandForCategoryInSupabase,
+  updateArticleInSupabase,
   updateBrandInSupabase,
   updateCategoryInSupabase,
 } from "@/lib/supabase/inventory";
 import type {
   Article,
   ArticleDraft,
+  ArticleUpdateDraft,
   Brand,
   BrandDraft,
   Category,
@@ -36,6 +42,7 @@ import type {
   InventoryState,
   LocationDraft,
   Movement,
+  MovementUpdateDraft,
   MutationResult,
   OutputDraft,
   RequestDraft,
@@ -50,8 +57,12 @@ type InventoryContextValue = InventoryState & {
   syncError: string | null;
   refreshInventory: () => Promise<void>;
   createArticle: (draft: ArticleDraft) => MutationResult;
+  updateArticle: (articleId: string, draft: ArticleUpdateDraft) => MutationResult;
+  deleteArticle: (articleId: string) => MutationResult;
   addEntry: (draft: EntryDraft) => MutationResult;
   addOutput: (draft: OutputDraft) => MutationResult;
+  updateMovement: (movementId: string, draft: MovementUpdateDraft) => MutationResult;
+  deleteMovement: (movementId: string) => MutationResult;
   createRequest: (_draft: RequestDraft) => void;
   approveRequest: (_requestId: string) => void;
   rejectRequest: (_requestId: string, _comment: string) => boolean;
@@ -66,7 +77,7 @@ type InventoryContextValue = InventoryState & {
   deleteLocation: (_locationId: string) => MutationResult;
 };
 
-const STORAGE_KEY = "asuka-inventory-mvp-stock-v4";
+const STORAGE_KEY = "asuka-inventory-mvp-stock-v5";
 const InventoryContext = createContext<InventoryContextValue | null>(null);
 
 function createId(prefix: string) {
@@ -148,7 +159,7 @@ function saveDemoState(payload: {
 }
 
 function buildDerivedEntries(movements: Movement[]): StockEntry[] {
-  return movements
+  return getActiveMovements(movements)
     .filter((movement) => movement.type === "entry")
     .map((movement) => ({
       id: movement.id,
@@ -160,6 +171,12 @@ function buildDerivedEntries(movements: Movement[]): StockEntry[] {
       recordedBy: movement.actor,
       note: movement.note,
     }));
+}
+
+function getMovementSyncErrorLabel(action: "create" | "update") {
+  return action === "update"
+    ? "Mouvement non mis à jour avec Supabase."
+    : "Mouvement non synchronisé avec Supabase.";
 }
 
 function buildLegacyFailure(message: string): MutationResult {
@@ -416,6 +433,61 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       });
   }
 
+  function syncArticleUpdate(
+    articleId: string,
+    payload: {
+      brandId: string;
+      categoryId: string;
+      name: string;
+      reference: string;
+      unit: string;
+      alertThreshold: number;
+    },
+    previousArticles: Article[]
+  ) {
+    if (syncMode !== "supabase" || !isSupabaseInventoryEnabled()) {
+      return;
+    }
+
+    void updateArticleInSupabase(articleId, payload)
+      .then((updated) => {
+        setBaseArticles((current) =>
+          current.map((article) =>
+            article.id === articleId
+              ? {
+                  ...updated,
+                  availableQty: article.availableQty,
+                }
+              : article
+          )
+        );
+        setSyncError(null);
+      })
+      .catch((error) => {
+        setBaseArticles(previousArticles);
+        setSyncError(
+          error instanceof Error
+            ? `Article non synchronisé : ${error.message}`
+            : "Article non synchronisé avec Supabase."
+        );
+      });
+  }
+
+  function syncArticleDelete(articleId: string, previousArticles: Article[]) {
+    if (syncMode !== "supabase" || !isSupabaseInventoryEnabled()) {
+      return;
+    }
+
+    void deleteArticleInSupabase(articleId).catch((error) => {
+      setBaseArticles(previousArticles);
+      setSyncError(
+        error instanceof Error
+          ? `Suppression article non synchronisée : ${error.message}`
+          : "Suppression article non synchronisée avec Supabase."
+      );
+    });
+  }
+
   function syncMovementInsert(
     optimisticMovement: Movement,
     payload: {
@@ -426,6 +498,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       source?: string;
       condition?: StockCondition;
       note: string;
+      correctionReason?: string;
+      replacesMovementId?: string;
     },
     previousMovements: Movement[]
   ) {
@@ -448,6 +522,87 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             : "Mouvement non synchronise avec Supabase."
         );
       });
+  }
+
+  function syncMovementReplacement(
+    originalMovement: Movement,
+    optimisticMovement: Movement,
+    payload: {
+      articleId: string;
+      type: "entry" | "output";
+      quantity: number;
+      actor: string;
+      source?: string;
+      condition?: StockCondition;
+      note: string;
+      correctionReason: string;
+    },
+    previousMovements: Movement[]
+  ) {
+    if (syncMode !== "supabase" || !isSupabaseInventoryEnabled()) {
+      return;
+    }
+
+    void insertMovementInSupabase({
+      ...payload,
+      correctionReason: payload.correctionReason,
+      replacesMovementId: originalMovement.id,
+    })
+      .then((inserted) =>
+        markMovementAsReplacedInSupabase(originalMovement.id, inserted.id).then(() => inserted)
+      )
+      .then((inserted) => {
+        setMovements((current) =>
+          current.map((movement) => {
+            if (movement.id === optimisticMovement.id) {
+              return inserted;
+            }
+
+            if (movement.id === originalMovement.id) {
+              return {
+                ...movement,
+                replacedByMovementId: inserted.id,
+              };
+            }
+
+            return movement;
+          })
+        );
+        setSyncError(null);
+      })
+      .catch((error) => {
+        setMovements(previousMovements);
+        setSyncError(
+          error instanceof Error
+            ? `Mouvement non synchronisé : ${error.message}`
+            : getMovementSyncErrorLabel("update")
+        );
+      });
+  }
+
+  function syncMovementDelete(
+    movementId: string,
+    previousMovements: Movement[],
+    originalMovementId?: string
+  ) {
+    if (syncMode !== "supabase" || !isSupabaseInventoryEnabled()) {
+      return;
+    }
+
+    const syncRequest = originalMovementId
+      ? deleteMovementInSupabase(movementId).then(() =>
+          clearMovementReplacementInSupabase(originalMovementId)
+        )
+      : deleteMovementInSupabase(movementId);
+
+    void syncRequest.catch((error) => {
+      setMovements(previousMovements);
+      setSyncError(
+        error instanceof Error
+          ? `Suppression mouvement non synchronisée : ${error.message}`
+          : "Suppression mouvement non synchronisée avec Supabase."
+      );
+    });
   }
 
   const createBrand = (draft: BrandDraft) => {
@@ -777,6 +932,129 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const updateArticle = (articleId: string, draft: ArticleUpdateDraft) => {
+    const article = liveStateRef.current.baseArticles.find((item) => item.id === articleId);
+    const name = draft.name.trim();
+    const brandId = draft.brandId.trim();
+    const categoryId = draft.categoryId.trim();
+    const reference = draft.reference.trim().toUpperCase();
+    const unit = draft.unit.trim().toLowerCase();
+    const alertThreshold = draft.alertThreshold;
+
+    if (!article) {
+      return { ok: false, message: "L’article demandé est introuvable." };
+    }
+
+    if (!name) {
+      return { ok: false, message: "Le nom de l’article est obligatoire." };
+    }
+
+    if (!brandId) {
+      return { ok: false, message: "La marque est obligatoire." };
+    }
+
+    if (!categoryId) {
+      return { ok: false, message: "La catégorie est obligatoire." };
+    }
+
+    const category = liveStateRef.current.categories.find((item) => item.id === categoryId);
+
+    if (!category) {
+      return { ok: false, message: "La catégorie sélectionnée est introuvable." };
+    }
+
+    if (category.brandId !== brandId) {
+      return { ok: false, message: "La catégorie ne correspond pas à la marque choisie." };
+    }
+
+    if (!reference) {
+      return { ok: false, message: "La référence article est obligatoire." };
+    }
+
+    if (!unit) {
+      return { ok: false, message: "L’unité est obligatoire." };
+    }
+
+    if (alertThreshold < 0) {
+      return { ok: false, message: "Le seuil d’alerte ne peut pas être négatif." };
+    }
+
+    if (
+      liveStateRef.current.baseArticles.some(
+        (item) => item.id !== articleId && normalize(item.reference) === normalize(reference)
+      )
+    ) {
+      return { ok: false, message: "Une autre référence article existe déjà." };
+    }
+
+    const previousArticles = liveStateRef.current.baseArticles;
+
+    setBaseArticles((current) =>
+      current.map((item) =>
+        item.id === articleId
+          ? {
+              ...item,
+              name,
+              brandId,
+              categoryId,
+              reference,
+              unit,
+              alertThreshold,
+            }
+          : item
+      )
+    );
+    setSyncError(null);
+
+    syncArticleUpdate(
+      articleId,
+      {
+        brandId,
+        categoryId,
+        name,
+        reference,
+        unit,
+        alertThreshold,
+      },
+      previousArticles
+    );
+
+    return {
+      ok: true,
+      message:
+        syncMode === "supabase"
+          ? "Article mis à jour. Synchronisation Supabase en cours."
+          : "Article mis à jour en mode démo.",
+    };
+  };
+
+  const deleteArticle = (articleId: string) => {
+    const linkedMovements = liveStateRef.current.movements.filter(
+      (movement) => movement.articleId === articleId
+    ).length;
+
+    if (linkedMovements > 0) {
+      return {
+        ok: false,
+        message:
+          "Supprimez d’abord les mouvements liés à cet article avant de le retirer du catalogue.",
+      };
+    }
+
+    const previousArticles = liveStateRef.current.baseArticles;
+    setBaseArticles((current) => current.filter((article) => article.id !== articleId));
+    setSyncError(null);
+    syncArticleDelete(articleId, previousArticles);
+
+    return {
+      ok: true,
+      message:
+        syncMode === "supabase"
+          ? "Article supprimé. Synchronisation Supabase en cours."
+          : "Article supprimé en mode démo.",
+    };
+  };
+
   const addEntry = (draft: EntryDraft) => {
     const actor = draft.recordedBy.trim();
     const source = draft.source.trim();
@@ -784,11 +1062,11 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const article = articles.find((item) => item.id === draft.articleId);
 
     if (!article) {
-      return { ok: false, message: "L article selectionne est introuvable." };
+      return { ok: false, message: "L’article sélectionné est introuvable." };
     }
 
     if (draft.quantity <= 0) {
-      return { ok: false, message: "La quantite d entree doit etre superieure a zero." };
+      return { ok: false, message: "La quantité d’entrée doit être supérieure à zéro." };
     }
 
     if (!actor) {
@@ -796,7 +1074,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }
 
     if (!source) {
-      return { ok: false, message: "La provenance est obligatoire pour une entree." };
+      return { ok: false, message: "La provenance est obligatoire pour une entrée." };
     }
 
     const optimisticMovement: Movement = {
@@ -808,7 +1086,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       source,
       condition: draft.condition,
       date: new Date().toISOString(),
-      note: note || "Entree de stock",
+      note: note || "Entrée de stock",
     };
 
     const previousMovements = liveStateRef.current.movements;
@@ -834,8 +1112,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       ok: true,
       message:
         syncMode === "supabase"
-          ? "Entree ajoutee. Synchronisation Supabase en cours."
-          : "Entree ajoutee en mode demo.",
+          ? "Entrée ajoutée. Synchronisation Supabase en cours."
+          : "Entrée ajoutée en mode démo.",
     };
   };
 
@@ -845,17 +1123,17 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const article = articles.find((item) => item.id === draft.articleId);
 
     if (!article) {
-      return { ok: false, message: "L article selectionne est introuvable." };
+      return { ok: false, message: "L’article sélectionné est introuvable." };
     }
 
     if (draft.quantity <= 0) {
-      return { ok: false, message: "La quantite de sortie doit etre superieure a zero." };
+      return { ok: false, message: "La quantité de sortie doit être supérieure à zéro." };
     }
 
     if (draft.quantity > article.availableQty) {
       return {
         ok: false,
-        message: "La quantite demandee depasse le stock disponible pour cet article.",
+        message: "La quantité demandée dépasse le stock disponible pour cet article.",
       };
     }
 
@@ -898,8 +1176,181 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       ok: true,
       message:
         syncMode === "supabase"
-          ? "Sortie ajoutee. Synchronisation Supabase en cours."
-          : "Sortie ajoutee en mode demo.",
+          ? "Sortie ajoutée. Synchronisation Supabase en cours."
+          : "Sortie ajoutée en mode démo.",
+    };
+  };
+
+  const updateMovement = (movementId: string, draft: MovementUpdateDraft) => {
+    const originalMovement = liveStateRef.current.movements.find((movement) => movement.id === movementId);
+
+    if (!originalMovement) {
+      return { ok: false, message: "Le mouvement demandé est introuvable." };
+    }
+
+    if (originalMovement.replacedByMovementId) {
+      return { ok: false, message: "Ce mouvement a déjà été corrigé. Modifiez plutôt sa version active." };
+    }
+
+    const article = articles.find((item) => item.id === originalMovement.articleId);
+
+    if (!article) {
+      return { ok: false, message: "L'article lié à ce mouvement est introuvable." };
+    }
+
+    if (originalMovement.type !== "entry" && originalMovement.type !== "output") {
+      return { ok: false, message: "Seules les entrées et les sorties peuvent être modifiées ici." };
+    }
+
+    const actor = draft.actor.trim();
+    const note = draft.note.trim();
+    const correctionReason = draft.correctionReason.trim();
+    const quantity = draft.quantity;
+
+    if (quantity <= 0) {
+      return { ok: false, message: "La quantité doit être supérieure à zéro." };
+    }
+
+    if (!actor) {
+      return { ok: false, message: "La personne qui modifie le mouvement est obligatoire." };
+    }
+
+    if (!note) {
+      return {
+        ok: false,
+        message:
+          originalMovement.type === "entry"
+            ? "L'observation de l'entrée est obligatoire."
+            : "La raison de sortie est obligatoire.",
+      };
+    }
+
+    if (!correctionReason) {
+      return { ok: false, message: "Le motif de modification est obligatoire pour garder l'historique." };
+    }
+
+    if (originalMovement.type === "entry") {
+      const source = draft.source?.trim() ?? "";
+      const baselineAvailableQty = article.availableQty - originalMovement.quantity;
+
+      if (!source) {
+        return { ok: false, message: "La provenance est obligatoire pour une entrée." };
+      }
+
+      if (baselineAvailableQty + quantity < 0) {
+        return {
+          ok: false,
+          message: "Cette correction ferait passer le stock sous zéro pour cet article.",
+        };
+      }
+    } else {
+      const baselineAvailableQty = article.availableQty + originalMovement.quantity;
+
+      if (quantity > baselineAvailableQty) {
+        return {
+          ok: false,
+          message: "La quantité corrigée dépasse le stock disponible pour cette sortie.",
+        };
+      }
+    }
+
+    const correctionMovement: Movement = {
+      id: createId("mov"),
+      type: originalMovement.type,
+      articleId: originalMovement.articleId,
+      quantity,
+      actor,
+      source: originalMovement.type === "entry" ? draft.source?.trim() ?? "" : undefined,
+      condition: originalMovement.type === "entry" ? draft.condition ?? originalMovement.condition : undefined,
+      date: new Date().toISOString(),
+      note,
+      correctionReason,
+      replacesMovementId: originalMovement.id,
+    };
+
+    const previousMovements = liveStateRef.current.movements;
+
+    setMovements((current) => [
+      correctionMovement,
+      ...current.map((movement) =>
+        movement.id === originalMovement.id
+          ? {
+              ...movement,
+              replacedByMovementId: correctionMovement.id,
+            }
+          : movement
+      ),
+    ]);
+    setSyncError(null);
+
+    syncMovementReplacement(
+      originalMovement,
+      correctionMovement,
+      {
+        articleId: correctionMovement.articleId,
+        type: originalMovement.type,
+        quantity: correctionMovement.quantity,
+        actor: correctionMovement.actor,
+        source: correctionMovement.source,
+        condition: correctionMovement.condition,
+        note: correctionMovement.note,
+        correctionReason,
+      },
+      previousMovements
+    );
+
+    return {
+      ok: true,
+      message:
+        syncMode === "supabase"
+          ? "Mouvement corrigé. L'historique est conservé et la synchronisation Supabase est en cours."
+          : "Mouvement corrigé en mode démo. L'historique est conservé.",
+    };
+  };
+
+  const deleteMovement = (movementId: string) => {
+    const movement = liveStateRef.current.movements.find((item) => item.id === movementId);
+
+    if (!movement) {
+      return { ok: false, message: "Le mouvement demandé est introuvable." };
+    }
+
+    if (movement.replacedByMovementId) {
+      return {
+        ok: false,
+        message: "Supprimez plutôt la version active du mouvement pour garder un historique cohérent.",
+      };
+    }
+
+    const previousMovements = liveStateRef.current.movements;
+
+    if (movement.replacesMovementId) {
+      setMovements((current) =>
+        current
+          .filter((item) => item.id !== movementId)
+          .map((item) =>
+            item.id === movement.replacesMovementId
+              ? {
+                  ...item,
+                  replacedByMovementId: undefined,
+                }
+              : item
+          )
+      );
+      setSyncError(null);
+      syncMovementDelete(movementId, previousMovements, movement.replacesMovementId);
+    } else {
+      setMovements((current) => current.filter((item) => item.id !== movementId));
+      setSyncError(null);
+      syncMovementDelete(movementId, previousMovements);
+    }
+
+    return {
+      ok: true,
+      message:
+        syncMode === "supabase"
+          ? "Mouvement supprimé. Synchronisation Supabase en cours."
+          : "Mouvement supprimé en mode démo.",
     };
   };
 
@@ -916,8 +1367,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     syncError,
     refreshInventory,
     createArticle,
+    updateArticle,
+    deleteArticle,
     addEntry,
     addOutput,
+    updateMovement,
+    deleteMovement,
     createRequest: () => {},
     approveRequest: () => {},
     rejectRequest: () => false,

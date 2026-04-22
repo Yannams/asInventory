@@ -1,10 +1,12 @@
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, Search } from "lucide-react";
 import type {
   ChangeEventHandler,
   ReactNode,
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from "react";
+import type { LucideIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,22 +16,43 @@ type ListPageHeaderProps = {
   title: string;
   description: string;
   action?: ReactNode;
+  icon?: LucideIcon;
+  backHref?: string;
+  backLabel?: string;
 };
 
 export function ListPageHeader({
   title,
   description,
   action,
+  icon: Icon,
+  backHref,
+  backLabel = "Retour",
 }: ListPageHeaderProps) {
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-      <div className="space-y-2">
-        <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          {title}
-        </h1>
-        <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-          {description}
-        </p>
+      <div className="flex items-start gap-4">
+        {backHref ? (
+          <Link
+            href={backHref}
+            aria-label={backLabel}
+            className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-white text-foreground shadow-soft transition hover:border-primary hover:text-primary"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+        ) : Icon ? (
+          <div className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+        ) : null}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+            {title}
+          </h1>
+          <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
+            {description}
+          </p>
+        </div>
       </div>
       {action ? <div className="flex flex-wrap gap-3">{action}</div> : null}
     </div>
@@ -175,25 +198,5 @@ export function ListTableCell({
     <td className={cn("border-t border-border px-6 py-5 align-top", className)} {...props}>
       {children}
     </td>
-  );
-}
-
-type ListFeedbackBannerProps = {
-  kind: "success" | "error";
-  text: string;
-};
-
-export function ListFeedbackBanner({ kind, text }: ListFeedbackBannerProps) {
-  return (
-    <div
-      className={cn(
-        "rounded-[24px] border px-5 py-4 text-sm",
-        kind === "success"
-          ? "border-primary/25 bg-primary/10 text-foreground"
-          : "border-red-200 bg-red-50 text-red-700"
-      )}
-    >
-      {text}
-    </div>
   );
 }

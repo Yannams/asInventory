@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUpFromLine, History, PackagePlus } from "lucide-react";
+import { ArrowUpFromLine, History, PackagePlus } from "lucide-react";
 
 import { useInventory } from "@/components/inventory-provider";
 import { PageHeader } from "@/components/page-header";
@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getBrandName, getCategoryName } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
+import { getActiveMovements } from "@/lib/stock";
 
 export function ArticleDetailScreen({ articleId }: { articleId: string }) {
   const { articles, brands, categories, entries, movements } = useInventory();
@@ -38,36 +39,27 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
   const articleMovements = [...movements]
     .filter((movement) => movement.articleId === article.id)
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+  const activeArticleMovements = getActiveMovements(articleMovements);
   const latestEntry = articleEntries[0];
-  const totalOutputs = articleMovements
+  const totalOutputs = activeArticleMovements
     .filter((movement) => movement.type === "output")
     .reduce((sum, movement) => sum + movement.quantity, 0);
 
   return (
     <div className="space-y-6">
       <PageHeader
+        backHref="/stock/articles"
+        backLabel="Retour aux articles"
         eyebrow="Fiche article"
         title={article.name}
-        description="Cette fiche concentre le niveau du stock, les dernieres receptions et les sorties enregistrees avec leur raison."
-        actions={
-          <>
-            <Link href="/stock/articles" className={buttonVariants({ variant: "outline" })}>
-              <ArrowLeft className="h-4 w-4" />
-              Retour liste
-            </Link>
-            <Link href="/stock/outputs" className={buttonVariants()}>
-              <ArrowUpFromLine className="h-4 w-4" />
-              Enregistrer une sortie
-            </Link>
-          </>
-        }
+        description="Cette fiche concentre le niveau du stock, les dernières réceptions et les sorties enregistrées avec leur raison."
       />
 
       <section className="grid gap-4 lg:grid-cols-4">
         <InfoCard label="Stock actuel" value={`${article.availableQty} ${article.unit}`} />
-        <InfoCard label="Seuil d alerte" value={`${article.alertThreshold} ${article.unit}`} />
-        <InfoCard label="Entrees tracees" value={`${articleEntries.length}`} />
-        <InfoCard label="Sorties cumulees" value={`${totalOutputs} ${article.unit}`} />
+        <InfoCard label="Seuil d’alerte" value={`${article.alertThreshold} ${article.unit}`} />
+        <InfoCard label="Entrées tracées" value={`${articleEntries.length}`} />
+        <InfoCard label="Sorties cumulées" value={`${totalOutputs} ${article.unit}`} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
@@ -76,30 +68,28 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
             <Badge variant="neutral" className="mb-3 w-fit">
               Synthese
             </Badge>
-            <CardTitle className="text-2xl">Etat de la reference</CardTitle>
+            <CardTitle className="text-2xl">État de la référence</CardTitle>
             <CardDescription>
-              Les infos utiles pour piloter le stock avec un referentiel simple.
+              Les infos utiles pour piloter le stock avec un référentiel simple.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <DetailTile label="Marque" value={getBrandName(brands, article.brandId)} />
-            <DetailTile label="Categorie" value={getCategoryName(categories, article.categoryId)} />
-            <DetailTile label="Reference" value={article.reference} />
-            <DetailTile label="Unite" value={article.unit} />
+            <DetailTile label="Catégorie" value={getCategoryName(categories, article.categoryId)} />
+            <DetailTile label="Référence" value={article.reference} />
+            <DetailTile label="Unité" value={article.unit} />
             <div className="rounded-[24px] border border-border p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Sante stock</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Santé stock</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <StockHealthBadge article={article} />
               </div>
             </div>
             <DetailTile label="Stock disponible" value={`${article.availableQty} ${article.unit}`} />
             <div className="rounded-[24px] border border-border p-4 sm:col-span-2">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Derniere entree</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Dernière entrée</p>
               {latestEntry ? (
                 <div className="mt-3 space-y-2 text-sm leading-6 text-foreground">
-                  <p>
-                    {latestEntry.quantity} {article.unit} recue(s) le {formatDateTime(latestEntry.date)}
-                  </p>
+                  <p>{latestEntry.quantity} {article.unit} reçue(s) le {formatDateTime(latestEntry.date)}</p>
                   <p>Provenance: {latestEntry.source}</p>
                   <div className="flex flex-wrap gap-2">
                     <ConditionBadge condition={latestEntry.condition} />
@@ -107,7 +97,7 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  Aucune entree n a encore ete enregistree pour cette reference.
+                  Aucune entrée n’a encore été enregistrée pour cette référence.
                 </p>
               )}
             </div>
@@ -121,24 +111,24 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
             </Badge>
             <CardTitle className="text-2xl text-white">Ce que raconte la fiche</CardTitle>
             <CardDescription className="text-white/65">
-              Une synthese courte pour decider vite sur le reassort ou la prochaine sortie.
+              Une synthèse courte pour décider vite sur le réassort ou la prochaine sortie.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <InsightRow
               icon={PackagePlus}
-              title="Receptions"
-              detail={`${articleEntries.length} entree(s) sont deja tracees sur cette reference.`}
+              title="Réceptions"
+              detail={`${articleEntries.length} entrée(s) sont déjà tracées sur cette référence.`}
             />
             <InsightRow
               icon={ArrowUpFromLine}
               title="Sorties"
-              detail={`${totalOutputs} ${article.unit} sont deja sorties du stock.`}
+              detail={`${totalOutputs} ${article.unit} sont déjà sorties du stock.`}
             />
             <InsightRow
               icon={History}
               title="Historique"
-              detail={`${articleMovements.length} mouvement(s) au total sur la periode visible.`}
+              detail={`${articleMovements.length} mouvement(s) au total sur la période visible.`}
             />
           </CardContent>
         </Card>
@@ -148,11 +138,11 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
         <Card>
           <CardHeader>
             <Badge variant="neutral" className="mb-3 w-fit">
-              Entrees
+              Entrées
             </Badge>
-            <CardTitle className="text-2xl">Dernieres receptions</CardTitle>
+            <CardTitle className="text-2xl">Dernières réceptions</CardTitle>
             <CardDescription>
-              Les lots recus avec leur provenance et leur etat.
+              Les lots reçus avec leur provenance et leur état.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -176,7 +166,7 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
               ))
             ) : (
               <div className="rounded-[24px] border border-dashed border-border p-6 text-sm text-muted-foreground">
-                Aucune entree n est encore disponible sur cette fiche.
+                Aucune entrée n’est encore disponible sur cette fiche.
               </div>
             )}
           </CardContent>
@@ -187,9 +177,9 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
             <Badge variant="neutral" className="mb-3 w-fit">
               Mouvements
             </Badge>
-            <CardTitle className="text-2xl">Historique recent</CardTitle>
+            <CardTitle className="text-2xl">Historique récent</CardTitle>
             <CardDescription>
-              Entrees et sorties enregistrees sur cette reference.
+              Entrées et sorties enregistrées sur cette référence.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -210,7 +200,7 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
               ))
             ) : (
               <div className="rounded-[24px] border border-dashed border-border p-6 text-sm text-muted-foreground">
-                Aucun mouvement n est encore enregistre pour cette reference.
+                Aucun mouvement n’est encore enregistré pour cette référence.
               </div>
             )}
           </CardContent>

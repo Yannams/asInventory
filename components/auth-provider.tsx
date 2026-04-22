@@ -18,6 +18,7 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  updateProfile: (fullName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -78,6 +79,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           password,
         });
+
+        return { error: error?.message ?? null };
+      },
+      updateProfile: async (fullName: string) => {
+        if (!supabase) {
+          return { error: "Supabase Auth n'est pas configure." };
+        }
+
+        const sanitizedName = fullName.trim();
+        const { data, error } = await supabase.auth.updateUser({
+          data: {
+            full_name: sanitizedName,
+            name: sanitizedName,
+          },
+        });
+
+        if (!error && data.user) {
+          setSession((current) => (current ? { ...current, user: data.user } : current));
+        }
 
         return { error: error?.message ?? null };
       },

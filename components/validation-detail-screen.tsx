@@ -64,15 +64,11 @@ export function ValidationDetailScreen({ requestId }: { requestId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
+        backHref="/validations"
+        backLabel="Retour aux validations"
         eyebrow="Detail de validation"
         title={currentRequest.id}
         description="La demande est traitee sur une page dediee pour garder la table des validations compacte et facile a parcourir."
-        actions={
-          <Link href="/validations" className={buttonVariants({ variant: "outline" })}>
-            <ArrowLeft className="h-4 w-4" />
-            Retour liste
-          </Link>
-        }
       />
 
       <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">

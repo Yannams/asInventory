@@ -1,13 +1,12 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { PackagePlus, Plus } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { FilterMenu } from "@/components/filter-menu";
 import { LabeledField } from "@/components/labeled-field";
 import {
-  ListFeedbackBanner,
   ListPageHeader,
   ListSearchBar,
   ListStatCard,
@@ -32,17 +31,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import { formatDateTime, getConditionLabel } from "@/lib/format";
 import type { StockCondition } from "@/lib/types";
-
-type Feedback = {
-  kind: "success" | "error";
-  text: string;
-};
 
 export function EntriesScreen() {
   const { user } = useAuth();
   const { articles, entries, addEntry } = useInventory();
+  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [articleId, setArticleId] = useState(articles[0]?.id ?? "");
   const [quantity, setQuantity] = useState("1");
@@ -52,9 +48,8 @@ export function EntriesScreen() {
   const [search, setSearch] = useState("");
   const [articleFilter, setArticleFilter] = useState("all");
   const [conditionFilter, setConditionFilter] = useState<"all" | StockCondition>("all");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const deferredSearch = useDeferredValue(search);
-  const actor = user?.email ?? "Utilisateur connecte";
+  const actor = user?.email ?? "Utilisateur connecté";
 
   const selectedArticle = articles.find((article) => article.id === articleId);
   const quantityNumber = Number(quantity) || 0;
@@ -105,9 +100,10 @@ export function EntriesScreen() {
       note: note.trim(),
     });
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok ? "Entrée enregistrée" : "Enregistrement impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
 
     if (result.ok) {
@@ -119,32 +115,32 @@ export function EntriesScreen() {
   return (
     <div className="space-y-6">
       <ListPageHeader
-        title="Gestion des entrees"
-        description="Trace les receptions de stock avec leur provenance et l etat reel du lot recu."
+        icon={PackagePlus}
+        title="Gestion des entrées"
+        description="Trace les réceptions de stock avec leur provenance et l’état réel du lot reçu."
         action={
           <Button className="gap-2" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4" />
-            Ajouter une entree
+            Ajouter une entrée
           </Button>
         }
       />
 
       <ListStatsGrid>
-        <ListStatCard label="Entrees" value={`${entries.length}`} detail="operations enregistrees" />
+        <ListStatCard label="Entrées" value={`${entries.length}`} detail="opérations enregistrées" />
         <ListStatCard
-          label="Quantites recues"
+          label="Quantités reçues"
           value={`${entries.reduce((sum, entry) => sum + entry.quantity, 0)}`}
-          detail="unites ajoutees au stock"
+          detail="unités ajoutées au stock"
           valueClassName="text-emerald-600"
         />
         <ListStatCard
           label="Lots sensibles"
           value={`${entries.filter((entry) => entry.condition === "maintenance").length}`}
-          detail="receptions en maintenance"
+          detail="réceptions en maintenance"
           valueClassName="text-amber-600"
         />
       </ListStatsGrid>
-      {feedback ? <ListFeedbackBanner kind={feedback.kind} text={feedback.text} /> : null}
 
       <ListToolbar>
         <ListToolbarRow>
@@ -170,12 +166,12 @@ export function EntriesScreen() {
                 ))}
               </Select>
             </LabeledField>
-            <LabeledField label="Etat recu">
+              <LabeledField label="État reçu">
               <Select
                 value={conditionFilter}
                 onChange={(event) => setConditionFilter(event.target.value as "all" | StockCondition)}
               >
-                <option value="all">Tous les etats</option>
+                <option value="all">Tous les états</option>
                 {(["new", "good", "maintenance", "used"] as StockCondition[]).map((value) => (
                   <option key={value} value={value}>
                     {getConditionLabel(value)}
@@ -191,10 +187,10 @@ export function EntriesScreen() {
         <thead>
           <tr className="bg-black/[0.03] text-left">
             <ListTableHeadCell>Article</ListTableHeadCell>
-            <ListTableHeadCell>Quantite</ListTableHeadCell>
+            <ListTableHeadCell>Quantité</ListTableHeadCell>
             <ListTableHeadCell>Provenance</ListTableHeadCell>
-            <ListTableHeadCell>Etat</ListTableHeadCell>
-            <ListTableHeadCell>Enregistre par</ListTableHeadCell>
+            <ListTableHeadCell>État</ListTableHeadCell>
+            <ListTableHeadCell>Enregistré par</ListTableHeadCell>
             <ListTableHeadCell>Date</ListTableHeadCell>
           </tr>
         </thead>
@@ -231,9 +227,9 @@ export function EntriesScreen() {
         <DialogContent>
           <DialogHeader>
             <div>
-              <DialogTitle>Ajouter une entree</DialogTitle>
+              <DialogTitle>Ajouter une entrée</DialogTitle>
               <DialogDescription>
-                La reception est automatiquement attribuee a la session connectee.
+                La réception est automatiquement attribuée à la session connectée.
               </DialogDescription>
             </div>
             <DialogCloseButton onClick={() => setDialogOpen(false)} />
@@ -241,8 +237,8 @@ export function EntriesScreen() {
           <DialogBody>
             <div className="mb-5 grid gap-4 rounded-[24px] bg-black p-5 text-white sm:grid-cols-3">
               <ImpactTile label="Stock actuel" value={`${selectedArticle?.availableQty ?? 0}`} />
-              <ImpactTile label="Entree saisie" value={`${quantityNumber}`} />
-              <ImpactTile label="Apres entree" value={`${projectedQty}`} />
+              <ImpactTile label="Entrée saisie" value={`${quantityNumber}`} />
+              <ImpactTile label="Après entrée" value={`${projectedQty}`} />
             </div>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <LabeledField label="Article">
@@ -255,7 +251,7 @@ export function EntriesScreen() {
                 </Select>
               </LabeledField>
               <div className="grid gap-4 sm:grid-cols-2">
-                <LabeledField label="Quantite recue">
+                <LabeledField label="Quantité reçue">
                   <Input
                     type="number"
                     min="1"
@@ -263,7 +259,7 @@ export function EntriesScreen() {
                     onChange={(event) => setQuantity(event.target.value)}
                   />
                 </LabeledField>
-                <LabeledField label="Etat du lot">
+                <LabeledField label="État du lot">
                   <Select
                     value={condition}
                     onChange={(event) => setCondition(event.target.value as StockCondition)}
@@ -278,9 +274,6 @@ export function EntriesScreen() {
               </div>
               <LabeledField label="Provenance">
                 <Input value={source} onChange={(event) => setSource(event.target.value)} />
-              </LabeledField>
-              <LabeledField label="Session connectee">
-                <Input value={actor} disabled />
               </LabeledField>
               <LabeledField label="Observation">
                 <textarea

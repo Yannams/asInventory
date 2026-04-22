@@ -24,7 +24,7 @@ export function MovementTypeBadge({ type }: { type: MovementType }) {
     return <Badge variant="warning">{getMovementTypeLabel(type)}</Badge>;
   }
 
-  if (type === "approval" || type === "entry" || type === "return") {
+  if (type === "entry" || type === "approval" || type === "return") {
     return <Badge variant="default">{getMovementTypeLabel(type)}</Badge>;
   }
 

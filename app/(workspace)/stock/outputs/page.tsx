@@ -1,5 +1,5 @@
-import { OutputsScreen } from "@/components/outputs-screen";
+import { redirect } from "next/navigation";
 
 export default function OutputsPage() {
-  return <OutputsScreen />;
+  redirect("/stock/movements?kind=output");
 }

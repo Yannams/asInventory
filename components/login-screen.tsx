@@ -128,8 +128,8 @@ export function LoginScreen({ nextPath }: { nextPath: string }) {
                   {isSubmitting ? "Connexion..." : "Se connecter"}
                 </Button>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Utilise les variables `NEXT_PUBLIC_SUPABASE_URL` et
-                  `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+                  Utilise `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+                  ou `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
                 </p>
               </form>
             ) : (

@@ -32,6 +32,9 @@ type MovementRow = {
   source: string | null;
   condition: StockCondition | null;
   note: string | null;
+  correction_reason: string | null;
+  replaces_movement_id: string | null;
+  replaced_by_movement_id: string | null;
   created_at: string;
 };
 
@@ -78,6 +81,9 @@ function mapMovement(row: MovementRow): Movement {
     condition: row.condition ?? undefined,
     date: row.created_at,
     note: row.note ?? "",
+    correctionReason: row.correction_reason ?? undefined,
+    replacesMovementId: row.replaces_movement_id ?? undefined,
+    replacedByMovementId: row.replaced_by_movement_id ?? undefined,
   };
 }
 
@@ -95,7 +101,7 @@ export async function fetchInventoryFromSupabase() {
       .order("created_at", { ascending: false }),
     supabase
       .from("stock_movements")
-      .select("id, article_id, type, quantity, actor, source, condition, note, created_at")
+      .select("id, article_id, type, quantity, actor, source, condition, note, correction_reason, replaces_movement_id, replaced_by_movement_id, created_at")
       .order("created_at", { ascending: false }),
   ]);
 
@@ -277,6 +283,54 @@ export async function insertArticleInSupabase(input: {
   return mapArticle(result.data);
 }
 
+export async function updateArticleInSupabase(
+  articleId: string,
+  input: {
+    brandId: string;
+    categoryId: string;
+    name: string;
+    reference: string;
+    unit: string;
+    alertThreshold: number;
+  }
+) {
+  if (!supabase) {
+    throw new Error("Supabase n'est pas configure.");
+  }
+
+  const result = await supabase
+    .from("articles")
+    .update({
+      brand_id: input.brandId,
+      category_id: input.categoryId,
+      name: input.name,
+      reference: input.reference,
+      unit: input.unit,
+      alert_threshold: input.alertThreshold,
+    })
+    .eq("id", articleId)
+    .select("id, brand_id, category_id, name, reference, unit, alert_threshold, created_at")
+    .single();
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return mapArticle(result.data);
+}
+
+export async function deleteArticleInSupabase(articleId: string) {
+  if (!supabase) {
+    throw new Error("Supabase n'est pas configure.");
+  }
+
+  const result = await supabase.from("articles").delete().eq("id", articleId);
+
+  if (result.error) {
+    throw result.error;
+  }
+}
+
 export async function insertMovementInSupabase(input: {
   articleId: string;
   type: "entry" | "output";
@@ -285,6 +339,8 @@ export async function insertMovementInSupabase(input: {
   source?: string;
   condition?: StockCondition;
   note: string;
+  correctionReason?: string;
+  replacesMovementId?: string;
 }) {
   if (!supabase) {
     throw new Error("Supabase n'est pas configure.");
@@ -300,8 +356,10 @@ export async function insertMovementInSupabase(input: {
       source: input.source ?? null,
       condition: input.condition ?? null,
       note: input.note,
+      correction_reason: input.correctionReason ?? null,
+      replaces_movement_id: input.replacesMovementId ?? null,
     })
-    .select("id, article_id, type, quantity, actor, source, condition, note, created_at")
+    .select("id, article_id, type, quantity, actor, source, condition, note, correction_reason, replaces_movement_id, replaced_by_movement_id, created_at")
     .single();
 
   if (result.error) {
@@ -309,4 +367,49 @@ export async function insertMovementInSupabase(input: {
   }
 
   return mapMovement(result.data);
+}
+
+export async function markMovementAsReplacedInSupabase(
+  movementId: string,
+  replacementMovementId: string
+) {
+  if (!supabase) {
+    throw new Error("Supabase n'est pas configure.");
+  }
+
+  const result = await supabase
+    .from("stock_movements")
+    .update({ replaced_by_movement_id: replacementMovementId })
+    .eq("id", movementId);
+
+  if (result.error) {
+    throw result.error;
+  }
+}
+
+export async function clearMovementReplacementInSupabase(movementId: string) {
+  if (!supabase) {
+    throw new Error("Supabase n'est pas configure.");
+  }
+
+  const result = await supabase
+    .from("stock_movements")
+    .update({ replaced_by_movement_id: null })
+    .eq("id", movementId);
+
+  if (result.error) {
+    throw result.error;
+  }
+}
+
+export async function deleteMovementInSupabase(movementId: string) {
+  if (!supabase) {
+    throw new Error("Supabase n'est pas configure.");
+  }
+
+  const result = await supabase.from("stock_movements").delete().eq("id", movementId);
+
+  if (result.error) {
+    throw result.error;
+  }
 }

@@ -7,7 +7,6 @@ import { useAuth } from "@/components/auth-provider";
 import { FilterMenu } from "@/components/filter-menu";
 import { LabeledField } from "@/components/labeled-field";
 import {
-  ListFeedbackBanner,
   ListPageHeader,
   ListSearchBar,
   ListStatCard,
@@ -31,25 +30,21 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/lib/format";
-
-type Feedback = {
-  kind: "success" | "error";
-  text: string;
-};
 
 export function OutputsScreen() {
   const { user } = useAuth();
   const { articles, movements, addOutput } = useInventory();
+  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [articleId, setArticleId] = useState(articles[0]?.id ?? "");
   const [quantity, setQuantity] = useState("1");
   const [reason, setReason] = useState("");
   const [search, setSearch] = useState("");
   const [articleFilter, setArticleFilter] = useState("all");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const deferredSearch = useDeferredValue(search);
-  const actor = user?.email ?? "Utilisateur connecte";
+  const actor = user?.email ?? "Utilisateur connecté";
 
   const selectedArticle = articles.find((article) => article.id === articleId);
   const quantityNumber = Number(quantity) || 0;
@@ -92,9 +87,10 @@ export function OutputsScreen() {
       note: reason.trim(),
     });
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok ? "Sortie enregistrée" : "Enregistrement impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
 
     if (result.ok) {
@@ -106,6 +102,7 @@ export function OutputsScreen() {
   return (
     <div className="space-y-6">
       <ListPageHeader
+        icon={ArrowUpFromLine}
         title="Gestion des sorties"
         description="Enregistre chaque sortie avec sa raison pour garder une trace claire de ce qui quitte le stock."
         action={
@@ -117,20 +114,19 @@ export function OutputsScreen() {
       />
 
       <ListStatsGrid>
-        <ListStatCard label="Sorties" value={`${outputs.length}`} detail="operations enregistrees" />
+        <ListStatCard label="Sorties" value={`${outputs.length}`} detail="opérations enregistrées" />
         <ListStatCard
-          label="Unites sorties"
+          label="Unités sorties"
           value={`${outputs.reduce((sum, movement) => sum + movement.quantity, 0)}`}
-          detail="debits cumules"
+          detail="débits cumulés"
           valueClassName="text-amber-600"
         />
         <ListStatCard
-          label="Articles touches"
+          label="Articles touchés"
           value={`${new Set(outputs.map((movement) => movement.articleId)).size}`}
-          detail="references concernees"
+          detail="références concernées"
         />
       </ListStatsGrid>
-      {feedback ? <ListFeedbackBanner kind={feedback.kind} text={feedback.text} /> : null}
 
       <ListToolbar>
         <ListToolbarRow>
@@ -158,9 +154,9 @@ export function OutputsScreen() {
         <thead>
           <tr className="bg-black/[0.03] text-left">
             <ListTableHeadCell>Article</ListTableHeadCell>
-            <ListTableHeadCell>Quantite</ListTableHeadCell>
+            <ListTableHeadCell>Quantité</ListTableHeadCell>
             <ListTableHeadCell>Raison</ListTableHeadCell>
-            <ListTableHeadCell>Enregistre par</ListTableHeadCell>
+            <ListTableHeadCell>Enregistré par</ListTableHeadCell>
             <ListTableHeadCell>Date</ListTableHeadCell>
           </tr>
         </thead>
@@ -207,7 +203,7 @@ export function OutputsScreen() {
             <div className="mb-5 grid gap-4 rounded-[24px] bg-black p-5 text-white sm:grid-cols-3">
               <ImpactTile label="Disponible" value={`${selectedArticle?.availableQty ?? 0}`} />
               <ImpactTile label="Sortie saisie" value={`${quantityNumber}`} />
-              <ImpactTile label="Reste apres sortie" value={`${projectedQty}`} />
+              <ImpactTile label="Reste après sortie" value={`${projectedQty}`} />
             </div>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <LabeledField label="Article">
@@ -220,7 +216,7 @@ export function OutputsScreen() {
                 </Select>
               </LabeledField>
               <div className="grid gap-4 sm:grid-cols-2">
-                <LabeledField label="Quantite">
+                <LabeledField label="Quantité">
                   <Input
                     type="number"
                     min="1"
@@ -228,15 +224,12 @@ export function OutputsScreen() {
                     onChange={(event) => setQuantity(event.target.value)}
                   />
                 </LabeledField>
-                <LabeledField label="Session connectee">
-                  <Input value={actor} disabled />
-                </LabeledField>
               </div>
               <LabeledField label="Raison de sortie">
                 <textarea
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
-                  placeholder="Ex: Vente client, SAV, demonstration, casse, usage interne..."
+                  placeholder="Ex : Vente client, SAV, démonstration, casse, usage interne..."
                   className="min-h-[120px] w-full rounded-[24px] border border-border bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
               </LabeledField>

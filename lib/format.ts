@@ -56,15 +56,15 @@ export function getRequestStatusLabel(status: RequestStatus) {
   }
 
   if (status === "approved") {
-    return "Validee";
+    return "Valid\u00e9e";
   }
 
-  return "Refusee";
+  return "Refus\u00e9e";
 }
 
 export function getMovementTypeLabel(type: MovementType) {
   const labels: Record<MovementType, string> = {
-    entry: "Entree",
+    entry: "Entr\u00e9e",
     output: "Sortie",
     adjustment: "Ajustement",
     approval: "Validation",
@@ -79,9 +79,9 @@ export function getMovementTypeLabel(type: MovementType) {
 export function getConditionLabel(condition: StockCondition) {
   const labels: Record<StockCondition, string> = {
     new: "Neuf",
-    good: "Bon etat",
+    good: "Bon \u00e9tat",
     maintenance: "Maintenance",
-    used: "Utilise",
+    used: "Utilis\u00e9",
   };
 
   return labels[condition];

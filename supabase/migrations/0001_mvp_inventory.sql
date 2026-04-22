@@ -33,6 +33,9 @@ create table if not exists public.stock_movements (
   source text,
   condition text check (condition in ('new', 'good', 'maintenance', 'used') or condition is null),
   note text not null default '',
+  correction_reason text,
+  replaces_movement_id uuid references public.stock_movements(id) on delete set null,
+  replaced_by_movement_id uuid references public.stock_movements(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -42,6 +45,11 @@ alter table if exists public.articles
 
 alter table if exists public.articles
   drop column if exists location;
+
+alter table if exists public.stock_movements
+  add column if not exists correction_reason text,
+  add column if not exists replaces_movement_id uuid references public.stock_movements(id) on delete set null,
+  add column if not exists replaced_by_movement_id uuid references public.stock_movements(id) on delete set null;
 
 alter table if exists public.stock_movements
   drop column if exists location;
@@ -61,6 +69,12 @@ create index if not exists stock_movements_article_id_idx
 create index if not exists stock_movements_created_at_idx
   on public.stock_movements(created_at desc);
 
+create index if not exists stock_movements_replaces_movement_id_idx
+  on public.stock_movements(replaces_movement_id);
+
+create index if not exists stock_movements_replaced_by_movement_id_idx
+  on public.stock_movements(replaced_by_movement_id);
+
 alter table public.brands enable row level security;
 alter table public.categories enable row level security;
 alter table public.articles enable row level security;
@@ -77,8 +91,11 @@ drop policy if exists "Authenticated users can delete categories" on public.cate
 drop policy if exists "Authenticated users can read articles" on public.articles;
 drop policy if exists "Authenticated users can insert articles" on public.articles;
 drop policy if exists "Authenticated users can update articles" on public.articles;
+drop policy if exists "Authenticated users can delete articles" on public.articles;
 drop policy if exists "Authenticated users can read stock movements" on public.stock_movements;
 drop policy if exists "Authenticated users can insert stock movements" on public.stock_movements;
+drop policy if exists "Authenticated users can update stock movements" on public.stock_movements;
+drop policy if exists "Authenticated users can delete stock movements" on public.stock_movements;
 
 create policy "Authenticated users can read brands"
   on public.brands
@@ -149,6 +166,12 @@ create policy "Authenticated users can update articles"
   using (true)
   with check (true);
 
+create policy "Authenticated users can delete articles"
+  on public.articles
+  for delete
+  to authenticated
+  using (true);
+
 create policy "Authenticated users can read stock movements"
   on public.stock_movements
   for select
@@ -160,3 +183,16 @@ create policy "Authenticated users can insert stock movements"
   for insert
   to authenticated
   with check (true);
+
+create policy "Authenticated users can update stock movements"
+  on public.stock_movements
+  for update
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "Authenticated users can delete stock movements"
+  on public.stock_movements
+  for delete
+  to authenticated
+  using (true);

@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useDeferredValue, useMemo, useState, type FormEvent } from "react";
 import { PencilLine, Plus, Tag, Trash2 } from "lucide-react";
 
+import { ActionMenu, ActionMenuItem } from "@/components/action-menu";
 import { LabeledField } from "@/components/labeled-field";
 import {
-  ListFeedbackBanner,
   ListPageHeader,
   ListSearchBar,
   ListStatCard,
@@ -17,7 +16,7 @@ import {
   ListToolbar,
 } from "@/components/list-page";
 import { useInventory } from "@/components/inventory-provider";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogBody,
@@ -28,19 +27,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-
-type Feedback = {
-  kind: "success" | "error";
-  text: string;
-};
+import { useToast } from "@/components/ui/toast";
 
 export function BrandsScreen() {
   const { brands, categories, articles, createBrand, updateBrand, deleteBrand } = useInventory();
+  const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const deferredSearch = useDeferredValue(search);
 
   const visibleBrands = useMemo(
@@ -66,14 +61,12 @@ export function BrandsScreen() {
   function openCreateDialog() {
     setEditingBrandId(null);
     setName("");
-    setFeedback(null);
     setDialogOpen(true);
   }
 
   function openEditDialog(brandId: string, currentName: string) {
     setEditingBrandId(brandId);
     setName(currentName);
-    setFeedback(null);
     setDialogOpen(true);
   }
 
@@ -90,9 +83,14 @@ export function BrandsScreen() {
       ? updateBrand(editingBrandId, { name })
       : createBrand({ name });
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok
+        ? editingBrandId
+          ? "Marque mise à jour"
+          : "Marque ajoutée"
+        : "Action impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
 
     if (result.ok) {
@@ -103,48 +101,40 @@ export function BrandsScreen() {
   function handleDelete(brandId: string) {
     const result = deleteBrand(brandId);
 
-    setFeedback({
-      kind: result.ok ? "success" : "error",
-      text: result.message,
+    toast({
+      title: result.ok ? "Marque supprimée" : "Suppression impossible",
+      description: result.message,
+      variant: result.ok ? "success" : "error",
     });
   }
 
   return (
     <div className="space-y-6">
       <ListPageHeader
+        icon={Tag}
         title="Gestion des marques"
-        description="Administre les marques du catalogue et garde une structure claire pour les categories et les articles."
+        description="Administre les marques du catalogue et garde une structure claire pour les catégories et les articles."
         action={
-          <>
-            <Link
-              href="/configuration/categories"
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Voir les categories
-            </Link>
-            <Button className="gap-2" onClick={openCreateDialog}>
-              <Plus className="h-4 w-4" />
-              Ajouter une marque
-            </Button>
-          </>
+          <Button className="gap-2" onClick={openCreateDialog}>
+            <Plus className="h-4 w-4" />
+            Ajouter une marque
+          </Button>
         }
       />
 
       <ListStatsGrid>
-        <ListStatCard label="Marques" value={`${brands.length}`} detail="marques configurees" />
+        <ListStatCard label="Marques" value={`${brands.length}`} detail="marques configurées" />
         <ListStatCard
-          label="Categories liees"
+          label="Catégories liées"
           value={`${categories.length}`}
-          detail="familles rattachees"
+          detail="familles rattachées"
         />
         <ListStatCard
-          label="Articles dependants"
+          label="Articles dépendants"
           value={`${articles.length}`}
-          detail="references classees"
+          detail="références classées"
         />
       </ListStatsGrid>
-      {feedback ? <ListFeedbackBanner kind={feedback.kind} text={feedback.text} /> : null}
-
       <ListToolbar>
         <ListSearchBar
           value={search}
@@ -159,7 +149,7 @@ export function BrandsScreen() {
           <tr className="bg-black/[0.03] text-left">
             <ListTableHeadCell>Marque</ListTableHeadCell>
             <ListTableHeadCell>Identifiant</ListTableHeadCell>
-            <ListTableHeadCell>Categories</ListTableHeadCell>
+            <ListTableHeadCell>Catégories</ListTableHeadCell>
             <ListTableHeadCell>Articles</ListTableHeadCell>
             <ListTableHeadCell>Actions</ListTableHeadCell>
           </tr>
@@ -182,7 +172,7 @@ export function BrandsScreen() {
                     <div>
                       <p className="text-lg font-semibold text-foreground">{brand.name}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {canDelete ? "Suppression possible" : "Encore reliee au catalogue"}
+                        {canDelete ? "Suppression possible" : "Encore reliée au catalogue"}
                       </p>
                     </div>
                   </div>
@@ -201,27 +191,22 @@ export function BrandsScreen() {
                   </span>
                 </ListTableCell>
                 <ListTableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(brand.id, brand.name)}
+                  <ActionMenu label={`Ouvrir les actions de la marque ${brand.name}`}>
+                    <ActionMenuItem
+                      icon={PencilLine}
+                      onSelect={() => openEditDialog(brand.id, brand.name)}
                     >
-                      <PencilLine className="h-4 w-4" />
                       Modifier
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      icon={Trash2}
+                      destructive
                       disabled={!canDelete}
-                      onClick={() => handleDelete(brand.id)}
+                      onSelect={() => handleDelete(brand.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
                       Supprimer
-                    </Button>
-                  </div>
+                    </ActionMenuItem>
+                  </ActionMenu>
                 </ListTableCell>
               </tr>
             );
@@ -256,7 +241,7 @@ export function BrandsScreen() {
                   Annuler
                 </Button>
                 <Button type="submit">
-                  {editingBrandId ? "Mettre a jour" : "Ajouter la marque"}
+                  {editingBrandId ? "Mettre à jour" : "Ajouter la marque"}
                 </Button>
               </div>
             </form>
