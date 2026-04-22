@@ -73,7 +73,7 @@ export function LoginScreen({ nextPath }: { nextPath: string }) {
                 <Input
                   type="email"
                   value={email}
-                  placeholder="loic@asworldtech.com"
+                  placeholder="prenom.nom@asworld.tech"
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </label>
