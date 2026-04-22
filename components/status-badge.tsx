@@ -3,9 +3,8 @@ import {
   getConditionLabel,
   getMovementTypeLabel,
   getRequestStatusLabel,
-  getStockHealth,
-  getStockHealthLabel,
 } from "@/lib/format";
+import { getStockStatus, getStockStatusLabel } from "@/lib/stock";
 import type { Article, MovementType, RequestStatus, StockCondition } from "@/lib/types";
 
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
@@ -33,17 +32,17 @@ export function MovementTypeBadge({ type }: { type: MovementType }) {
 }
 
 export function StockHealthBadge({ article }: { article: Article }) {
-  const health = getStockHealth(article);
+  const health = getStockStatus(article);
 
-  if (health === "healthy") {
-    return <Badge variant="default">{getStockHealthLabel(article)}</Badge>;
+  if (health === "available") {
+    return <Badge variant="default">{getStockStatusLabel(article)}</Badge>;
   }
 
-  if (health === "watch") {
-    return <Badge variant="neutral">{getStockHealthLabel(article)}</Badge>;
+  if (health === "low") {
+    return <Badge variant="warning">{getStockStatusLabel(article)}</Badge>;
   }
 
-  return <Badge variant="warning">{getStockHealthLabel(article)}</Badge>;
+  return <Badge variant="neutral">{getStockStatusLabel(article)}</Badge>;
 }
 
 export function ConditionBadge({ condition }: { condition: StockCondition }) {

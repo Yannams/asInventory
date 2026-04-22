@@ -24,6 +24,16 @@ export type Category = {
   name: string;
 };
 
+export type Location = {
+  id: string;
+  name: string;
+};
+
+export type MutationResult = {
+  ok: boolean;
+  message: string;
+};
+
 export type Article = {
   id: string;
   name: string;
@@ -32,8 +42,6 @@ export type Article = {
   reference: string;
   availableQty: number;
   alertThreshold: number;
-  location: string;
-  condition: StockCondition;
   unit: string;
 };
 
@@ -42,6 +50,7 @@ export type StockEntry = {
   articleId: string;
   quantity: number;
   source: string;
+  condition: StockCondition;
   date: string;
   recordedBy: string;
   note: string;
@@ -65,6 +74,8 @@ export type Movement = {
   articleId: string;
   quantity: number;
   actor: string;
+  source?: string;
+  condition?: StockCondition;
   relatedRequestId?: string;
   date: string;
   note: string;
@@ -82,6 +93,7 @@ export type ReportFilter = {
 export type InventoryState = {
   brands: Brand[];
   categories: Category[];
+  locations: Location[];
   articles: Article[];
   entries: StockEntry[];
   requests: StockRequest[];
@@ -92,7 +104,15 @@ export type EntryDraft = {
   articleId: string;
   quantity: number;
   source: string;
+  condition: StockCondition;
   recordedBy: string;
+  note: string;
+};
+
+export type OutputDraft = {
+  articleId: string;
+  quantity: number;
+  actor: string;
   note: string;
 };
 
@@ -103,4 +123,27 @@ export type RequestDraft = {
   reason: string;
   jobReference: string;
   note?: string;
+};
+
+export type BrandDraft = {
+  name: string;
+};
+
+export type CategoryDraft = {
+  brandId: string;
+  name: string;
+};
+
+export type LocationDraft = {
+  name: string;
+};
+
+export type ArticleDraft = {
+  name: string;
+  brandId: string;
+  categoryId: string;
+  reference: string;
+  availableQty: number;
+  alertThreshold: number;
+  unit: string;
 };

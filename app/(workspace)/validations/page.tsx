@@ -1,5 +1,5 @@
-import { ValidationsScreen } from "@/components/validations-screen";
+import { redirect } from "next/navigation";
 
 export default function ValidationsPage() {
-  return <ValidationsScreen />;
+  redirect("/stock/movements");
 }

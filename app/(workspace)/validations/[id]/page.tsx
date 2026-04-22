@@ -1,11 +1,8 @@
-import { ValidationDetailScreen } from "@/components/validation-detail-screen";
+import { redirect } from "next/navigation";
 
 export default async function ValidationDetailPage({
-  params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-
-  return <ValidationDetailScreen requestId={id} />;
+  redirect("/stock/movements");
 }

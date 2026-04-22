@@ -1,5 +1,5 @@
-import { RequestsScreen } from "@/components/requests-screen";
+import { redirect } from "next/navigation";
 
 export default function RequestsPage() {
-  return <RequestsScreen />;
+  redirect("/stock/movements");
 }

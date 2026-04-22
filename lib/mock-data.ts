@@ -3,6 +3,7 @@ import type {
   Brand,
   Category,
   InventoryState,
+  Location,
   Movement,
   ReportFilter,
   StockEntry,
@@ -47,6 +48,17 @@ export const categories: Category[] = [
   },
 ];
 
+export const locations: Location[] = [
+  { id: "loc-showroom-a1", name: "Showroom A1" },
+  { id: "loc-vitrine-b2", name: "Vitrine B2" },
+  { id: "loc-coffre-c1", name: "Coffre produit C1" },
+  { id: "loc-sav-e4", name: "Tiroir SAV E4" },
+  { id: "loc-sav-e5", name: "Tiroir SAV E5" },
+  { id: "loc-atelier-a2", name: "Atelier SAV A2" },
+  { id: "loc-bac-p3", name: "Bac micro-piece P3" },
+  { id: "loc-bac-p5", name: "Bac micro-piece P5" },
+];
+
 export const articles: Article[] = [
   {
     id: "art-air14",
@@ -56,8 +68,6 @@ export const articles: Article[] = [
     reference: "ASS-AIR14-I5",
     availableQty: 18,
     alertThreshold: 6,
-    location: "Showroom A1",
-    condition: "new",
     unit: "piece",
   },
   {
@@ -68,8 +78,6 @@ export const articles: Article[] = [
     reference: "ASS-WS3-AMOLED",
     availableQty: 9,
     alertThreshold: 10,
-    location: "Vitrine B2",
-    condition: "new",
     unit: "piece",
   },
   {
@@ -80,8 +88,6 @@ export const articles: Article[] = [
     reference: "ASS-VXR-128",
     availableQty: 5,
     alertThreshold: 4,
-    location: "Coffre produit C1",
-    condition: "new",
     unit: "piece",
   },
   {
@@ -92,8 +98,6 @@ export const articles: Article[] = [
     reference: "DRA-SCR-IP13-OLED",
     availableQty: 4,
     alertThreshold: 6,
-    location: "Tiroir SAV E4",
-    condition: "good",
     unit: "piece",
   },
   {
@@ -104,8 +108,6 @@ export const articles: Article[] = [
     reference: "DRA-SCR-A54-AMOLED",
     availableQty: 7,
     alertThreshold: 8,
-    location: "Tiroir SAV E5",
-    condition: "good",
     unit: "piece",
   },
   {
@@ -116,8 +118,6 @@ export const articles: Article[] = [
     reference: "DRA-TOOL-80IN1",
     availableQty: 11,
     alertThreshold: 5,
-    location: "Atelier SAV A2",
-    condition: "used",
     unit: "kit",
   },
   {
@@ -128,8 +128,6 @@ export const articles: Article[] = [
     reference: "DRA-CON-USB-C",
     availableQty: 132,
     alertThreshold: 40,
-    location: "Bac micro-piece P3",
-    condition: "new",
     unit: "piece",
   },
   {
@@ -140,8 +138,6 @@ export const articles: Article[] = [
     reference: "DRA-BAT-WS3",
     availableQty: 22,
     alertThreshold: 12,
-    location: "Bac micro-piece P5",
-    condition: "new",
     unit: "piece",
   },
 ];
@@ -152,6 +148,7 @@ export const entries: StockEntry[] = [
     articleId: "art-watch-s3",
     quantity: 6,
     source: "Usine Shenzhen - lot avril",
+    condition: "new",
     date: "2026-04-14T09:10:00.000Z",
     recordedBy: "Loic K.",
     note: "Reassort vitrine pour ASUKA SPIRIT Watch S3",
@@ -161,6 +158,7 @@ export const entries: StockEntry[] = [
     articleId: "art-connector-c",
     quantity: 80,
     source: "Fournisseur Shenzhen Repair Parts",
+    condition: "new",
     date: "2026-04-13T15:45:00.000Z",
     recordedBy: "Sandra A.",
     note: "Reassort SAV connecteurs USB-C",
@@ -170,6 +168,7 @@ export const entries: StockEntry[] = [
     articleId: "art-screen-a54",
     quantity: 5,
     source: "Grossiste mobile Abidjan",
+    condition: "good",
     date: "2026-04-12T10:20:00.000Z",
     recordedBy: "Loic K.",
     note: "Livraison partielle ecrans Galaxy A54",
@@ -308,6 +307,7 @@ export const defaultReportFilter: ReportFilter = {
 export const inventorySeed: InventoryState = {
   brands,
   categories,
+  locations,
   articles,
   entries,
   requests,

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { FilterMenu } from "@/components/filter-menu";
+import { LabeledField } from "@/components/labeled-field";
+import { ListPageHeader, ListStatCard, ListStatsGrid, ListToolbar } from "@/components/list-page";
 import { useInventory } from "@/components/inventory-provider";
-import { PageHeader } from "@/components/page-header";
 import { MovementTypeBadge, StockHealthBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,6 +28,13 @@ export function ReportsScreen() {
   const [technician, setTechnician] = useState("all");
   const [startDate, setStartDate] = useState("2026-04-08");
   const [endDate, setEndDate] = useState("2026-04-15");
+  const activeFilterCount =
+    (period !== "weekly" ? 1 : 0) +
+    (brand !== "all" ? 1 : 0) +
+    (category !== "all" ? 1 : 0) +
+    (technician !== "all" ? 1 : 0) +
+    (startDate !== "2026-04-08" ? 1 : 0) +
+    (endDate !== "2026-04-15" ? 1 : 0);
 
   useEffect(() => {
     if (period === "weekly") {
@@ -97,63 +106,99 @@ export function ReportsScreen() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Rapports"
+      <ListPageHeader
         title="Lire la consommation avant de penser export."
         description="La V1 reste consultative, mais elle donne deja une lecture hebdomadaire ou mensuelle utile pour la decision."
       />
 
-      <Card>
-        <CardHeader>
-          <Badge variant="neutral" className="mb-3 w-fit">
-            Periode et filtres
-          </Badge>
-          <CardTitle className="text-2xl">Ajuster la lecture</CardTitle>
-          <CardDescription>
-            Vue hebdo, mensuelle ou libre avec reduction par categorie et acteur.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-[0.8fr_0.9fr_0.9fr_0.85fr_1fr_1fr]">
-          <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
-            <option value="weekly">Hebdomadaire</option>
-            <option value="monthly">Mensuel</option>
-            <option value="custom">Libre</option>
-          </Select>
-          <Select value={brand} onChange={(event) => setBrand(event.target.value)}>
-            <option value="all">Toutes les marques</option>
-            {brands.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </Select>
-          <Select value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="all">Toutes les categories</option>
-            {visibleCategories.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </Select>
-          <Select value={technician} onChange={(event) => setTechnician(event.target.value)}>
-            <option value="all">Tous les acteurs</option>
-            {technicians.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </Select>
-          <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-        </CardContent>
-      </Card>
+      <ListToolbar>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Badge variant="neutral" className="mb-2 w-fit">
+              Periode et filtres
+            </Badge>
+            <p className="text-sm text-muted-foreground">
+              Vue hebdo, mensuelle ou libre avec reduction par categorie et acteur.
+            </p>
+          </div>
+          <FilterMenu
+            activeCount={activeFilterCount}
+            onClear={() => {
+              setPeriod("weekly");
+              setBrand("all");
+              setCategory("all");
+              setTechnician("all");
+              setStartDate("2026-04-08");
+              setEndDate("2026-04-15");
+            }}
+            title="Filtres de rapport"
+          >
+            <LabeledField label="Periode">
+              <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+                <option value="weekly">Hebdomadaire</option>
+                <option value="monthly">Mensuel</option>
+                <option value="custom">Libre</option>
+              </Select>
+            </LabeledField>
+            <LabeledField label="Marque">
+              <Select value={brand} onChange={(event) => setBrand(event.target.value)}>
+                <option value="all">Toutes les marques</option>
+                {brands.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </LabeledField>
+            <LabeledField label="Categorie">
+              <Select value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="all">Toutes les categories</option>
+                {visibleCategories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </LabeledField>
+            <LabeledField label="Acteur">
+              <Select value={technician} onChange={(event) => setTechnician(event.target.value)}>
+                <option value="all">Tous les acteurs</option>
+                {technicians.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </Select>
+            </LabeledField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LabeledField label="Date debut">
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                />
+              </LabeledField>
+              <LabeledField label="Date fin">
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => setEndDate(event.target.value)}
+                />
+              </LabeledField>
+            </div>
+          </FilterMenu>
+        </div>
+      </ListToolbar>
 
-      <section className="grid gap-4 lg:grid-cols-5">
-        <KpiCard label="Mouvements" value={`${filteredMovements.length}`} />
-        <KpiCard label="Sorties" value={`${outputMovements.length}`} />
-        <KpiCard label="Article le plus sorti" value={headlineArticle} />
-        <KpiCard label="Stock restant" value={`${totalStock}`} />
-        <KpiCard label="Sous seuil" value={`${criticalCount}`} />
+      <ListStatsGrid>
+        <ListStatCard label="Mouvements" value={`${filteredMovements.length}`} />
+        <ListStatCard label="Sorties" value={`${outputMovements.length}`} />
+        <ListStatCard label="Article le plus sorti" value={headlineArticle} />
+      </ListStatsGrid>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ListStatCard label="Stock restant" value={`${totalStock}`} />
+        <ListStatCard label="Sous seuil" value={`${criticalCount}`} valueClassName="text-amber-600" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -304,16 +349,5 @@ export function ReportsScreen() {
         </Card>
       </section>
     </div>
-  );
-}
-
-function KpiCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
   );
 }

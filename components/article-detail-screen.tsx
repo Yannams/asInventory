@@ -1,30 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, History, ScanSearch } from "lucide-react";
+import { ArrowLeft, ArrowUpFromLine, History, PackagePlus } from "lucide-react";
 
 import { useInventory } from "@/components/inventory-provider";
 import { PageHeader } from "@/components/page-header";
-import {
-  ConditionBadge,
-  MovementTypeBadge,
-  RequestStatusBadge,
-  StockHealthBadge,
-} from "@/components/status-badge";
+import { ConditionBadge, MovementTypeBadge, StockHealthBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getBrandName, getCategoryName } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
 
 export function ArticleDetailScreen({ articleId }: { articleId: string }) {
-  const { articles, brands, categories, movements, requests } = useInventory();
+  const { articles, brands, categories, entries, movements } = useInventory();
   const article = articles.find((item) => item.id === articleId);
 
   if (!article) {
@@ -43,8 +32,13 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
     );
   }
 
-  const articleMovements = movements.filter((movement) => movement.articleId === article.id);
-  const articleRequests = requests.filter((request) => request.articleId === article.id);
+  const articleEntries = [...entries]
+    .filter((entry) => entry.articleId === article.id)
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+  const articleMovements = [...movements]
+    .filter((movement) => movement.articleId === article.id)
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+  const latestEntry = articleEntries[0];
   const totalOutputs = articleMovements
     .filter((movement) => movement.type === "output")
     .reduce((sum, movement) => sum + movement.quantity, 0);
@@ -54,18 +48,16 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
       <PageHeader
         eyebrow="Fiche article"
         title={article.name}
-        description="Cette fiche concentre la tracabilite d une reference : niveau actuel, rythme de sortie, demandes associees et historique recent."
+        description="Cette fiche concentre le niveau du stock, les dernieres receptions et les sorties enregistrees avec leur raison."
         actions={
           <>
-            <Link
-              href="/stock/articles"
-              className={buttonVariants({ variant: "outline" })}
-            >
+            <Link href="/stock/articles" className={buttonVariants({ variant: "outline" })}>
               <ArrowLeft className="h-4 w-4" />
               Retour liste
             </Link>
-            <Link href="/stock/requests" className={buttonVariants()}>
-              Demander une sortie
+            <Link href="/stock/outputs" className={buttonVariants()}>
+              <ArrowUpFromLine className="h-4 w-4" />
+              Enregistrer une sortie
             </Link>
           </>
         }
@@ -74,48 +66,50 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
       <section className="grid gap-4 lg:grid-cols-4">
         <InfoCard label="Stock actuel" value={`${article.availableQty} ${article.unit}`} />
         <InfoCard label="Seuil d alerte" value={`${article.alertThreshold} ${article.unit}`} />
-        <InfoCard label="Sorties tracees" value={`${totalOutputs}`} />
-        <InfoCard label="Demandes liees" value={`${articleRequests.length}`} />
+        <InfoCard label="Entrees tracees" value={`${articleEntries.length}`} />
+        <InfoCard label="Sorties cumulees" value={`${totalOutputs} ${article.unit}`} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Card>
           <CardHeader>
             <Badge variant="neutral" className="mb-3 w-fit">
-              Etat de reference
+              Synthese
             </Badge>
-            <CardTitle className="text-2xl">Synthese metier</CardTitle>
+            <CardTitle className="text-2xl">Etat de la reference</CardTitle>
             <CardDescription>
-              Les informations qui aident le magasinier a juger vite et juste.
+              Les infos utiles pour piloter le stock avec un referentiel simple.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <DetailTile label="Marque" value={getBrandName(brands, article.brandId)} />
+            <DetailTile label="Categorie" value={getCategoryName(categories, article.categoryId)} />
             <DetailTile label="Reference" value={article.reference} />
-            <DetailTile
-              label="Categorie"
-              value={getCategoryName(categories, article.categoryId)}
-            />
-            <DetailTile label="Emplacement" value={article.location} />
             <DetailTile label="Unite" value={article.unit} />
             <div className="rounded-[24px] border border-border p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Sante stock
-              </p>
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Sante stock</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <StockHealthBadge article={article} />
-                <ConditionBadge condition={article.condition} />
               </div>
             </div>
-            <div className="rounded-[24px] border border-border p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Lecture rapide
-              </p>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                {article.availableQty <= article.alertThreshold
-                  ? "Cette reference est deja sous seuil et doit rester sous surveillance rapprochee."
-                  : "Le niveau reste exploitable, mais la consommation recente doit etre suivie."}
-              </p>
+            <DetailTile label="Stock disponible" value={`${article.availableQty} ${article.unit}`} />
+            <div className="rounded-[24px] border border-border p-4 sm:col-span-2">
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Derniere entree</p>
+              {latestEntry ? (
+                <div className="mt-3 space-y-2 text-sm leading-6 text-foreground">
+                  <p>
+                    {latestEntry.quantity} {article.unit} recue(s) le {formatDateTime(latestEntry.date)}
+                  </p>
+                  <p>Provenance: {latestEntry.source}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <ConditionBadge condition={latestEntry.condition} />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  Aucune entree n a encore ete enregistree pour cette reference.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -123,31 +117,28 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
         <Card className="bg-black text-white">
           <CardHeader>
             <Badge variant="warning" className="mb-3 w-fit">
-              Trajectoire de consommation
+              Lecture rapide
             </Badge>
-            <CardTitle className="text-2xl text-white">
-              Ce que cette fiche raconte
-            </CardTitle>
+            <CardTitle className="text-2xl text-white">Ce que raconte la fiche</CardTitle>
             <CardDescription className="text-white/65">
-              La decision n est pas seulement sur le stock actuel, mais sur sa
-              vitesse de consommation.
+              Une synthese courte pour decider vite sur le reassort ou la prochaine sortie.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <InsightRow
-              icon={ScanSearch}
-              title="Trace recente"
-              detail={`${articleMovements.length} mouvements relies a cette reference.`}
+              icon={PackagePlus}
+              title="Receptions"
+              detail={`${articleEntries.length} entree(s) sont deja tracees sur cette reference.`}
+            />
+            <InsightRow
+              icon={ArrowUpFromLine}
+              title="Sorties"
+              detail={`${totalOutputs} ${article.unit} sont deja sorties du stock.`}
             />
             <InsightRow
               icon={History}
-              title="Sorties cumulees"
-              detail={`${totalOutputs} ${article.unit} sont deja sorties sur l historique visible.`}
-            />
-            <InsightRow
-              icon={ArrowUpRight}
-              title="Demandes en attente"
-              detail={`${articleRequests.filter((request) => request.status === "pending").length} demande(s) encore a trancher.`}
+              title="Historique"
+              detail={`${articleMovements.length} mouvement(s) au total sur la periode visible.`}
             />
           </CardContent>
         </Card>
@@ -157,73 +148,69 @@ export function ArticleDetailScreen({ articleId }: { articleId: string }) {
         <Card>
           <CardHeader>
             <Badge variant="neutral" className="mb-3 w-fit">
-              Historique recent
+              Entrees
             </Badge>
-            <CardTitle className="text-2xl">Derniers mouvements</CardTitle>
+            <CardTitle className="text-2xl">Dernieres receptions</CardTitle>
             <CardDescription>
-              Entrees, sorties, validations et refus relies a cet article.
+              Les lots recus avec leur provenance et leur etat.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {articleMovements.slice(0, 6).map((movement) => (
-              <div
-                key={movement.id}
-                className="rounded-[24px] border border-border bg-muted/35 p-4"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-2">
-                    <MovementTypeBadge type={movement.type} />
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {movement.note}
-                    </p>
-                  </div>
-                  <div className="space-y-1 text-sm text-muted-foreground sm:text-right">
-                    <p>{movement.actor}</p>
-                    <p>{formatDateTime(movement.date)}</p>
+            {articleEntries.length ? (
+              articleEntries.slice(0, 6).map((entry) => (
+                <div key={entry.id} className="rounded-[24px] border border-border bg-muted/35 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2">
+                      <p className="font-medium">
+                        +{entry.quantity} {article.unit}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{entry.source}</p>
+                      <ConditionBadge condition={entry.condition} />
+                    </div>
+                    <div className="space-y-1 text-sm text-muted-foreground sm:text-right">
+                      <p>{entry.recordedBy}</p>
+                      <p>{formatDateTime(entry.date)}</p>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="rounded-[24px] border border-dashed border-border p-6 text-sm text-muted-foreground">
+                Aucune entree n est encore disponible sur cette fiche.
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <Badge variant="neutral" className="mb-3 w-fit">
-              Demandes associees
+              Mouvements
             </Badge>
-            <CardTitle className="text-2xl">Sorties et decisions</CardTitle>
+            <CardTitle className="text-2xl">Historique recent</CardTitle>
             <CardDescription>
-              Qui a demande quoi, quand et avec quelle decision.
+              Entrees et sorties enregistrees sur cette reference.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {articleRequests.length ? (
-              articleRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="rounded-[24px] border border-border bg-white p-4"
-                >
+            {articleMovements.length ? (
+              articleMovements.slice(0, 6).map((movement) => (
+                <div key={movement.id} className="rounded-[24px] border border-border bg-white p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-2">
-                      <p className="font-medium">{request.requester}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {request.quantity} {article.unit} · {request.jobReference}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{request.reason}</p>
-                      {request.reviewComment ? (
-                        <p className="text-sm text-foreground">
-                          Commentaire : {request.reviewComment}
-                        </p>
-                      ) : null}
+                      <MovementTypeBadge type={movement.type} />
+                      <p className="text-sm text-muted-foreground">{movement.note}</p>
                     </div>
-                    <RequestStatusBadge status={request.status} />
+                    <div className="space-y-1 text-sm text-muted-foreground sm:text-right">
+                      <p>{movement.actor}</p>
+                      <p>{formatDateTime(movement.date)}</p>
+                    </div>
                   </div>
                 </div>
               ))
             ) : (
               <div className="rounded-[24px] border border-dashed border-border p-6 text-sm text-muted-foreground">
-                Aucune demande n est encore associee a cette reference.
+                Aucun mouvement n est encore enregistre pour cette reference.
               </div>
             )}
           </CardContent>
